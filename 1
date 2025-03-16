@@ -26,11 +26,153 @@ _G.autofarm = true
 
 function autobr()
 	while _G.autobr == true do
-	wait()
-	            game:GetService("ReplicatedStorage").strengthFrame:Destroy()
+	wait()	            
 	            
 					local args = {
     [1] = "rep"
 }
 
-game:GetService("Players").LocalPlayer.muscle
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+
+                    local args = {
+    [1] = "rep"
+}
+
+game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+	end
+end	
+
+Tab:AddToggle({
+  Name = "自动锻炼",  
+  Default = false,
+  Callback = function(Value)
+    _G.autobr = Value
+        autobr()
+  end
+})
+
+_G.ar = true
+
+function ar()
+	while _G.ar == true do
+	wait()
+	game:GetService("ReplicatedStorage").strengthFrame:Destroy()
+	end
+end	
+
+Tab:AddToggle({
+  Name = "删除力量条",  
+  Default = false,
+  Callback = function(Value)
+    _G.ar = Value
+        ar()
+  end
+})
