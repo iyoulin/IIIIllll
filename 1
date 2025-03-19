@@ -15,6 +15,11 @@ Start = tick()
 		   vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
 		end)
 
+Window:AddMinimizeButton({
+  Button = { Image = redzlib:GetIcon("czl"), BackgroundTransparency = 0,Size = UDim2.fromOffset(60, 60), },
+  Corner = { CornerRadius = UDim.new(0, 10) }
+})
+
 local Tab = Window:MakeTab({" ", "cool"})
 
 _G.autofarm = true
@@ -83,25 +88,7 @@ game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
 game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
 
 
-                    local args = {
-    [1] = "rep"
-}
-
-game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
-
-
-                       local args = {
-    [1] = "rep"
-}
-
-game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
-
-
-                    local args = {
-    [1] = "rep"
-}
-
-game:GetService("Players").LocalPlayer.muscleEvent:FireServer(unpack(args))
+       
 
 	end
 end	
