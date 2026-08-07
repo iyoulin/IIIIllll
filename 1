@@ -1,1 +1,1421 @@
+-- ==================== 加载 WindUI 库 ====================
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Nov23Y/Nov23Y/refs/heads/main/windui"))()
 
+-- ==================== 必要服务 ====================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
+
+-- ==================== 防 AFK ====================
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+-- ==================== 全局变量 ====================
+_G.auto_train = false
+_G.auto_protein = false
+_G.auto_reb_stop = false
+_G.auto_shake = false
+_G.auto_bugrock = false
+_G.autotrade2 = false
+_G.autokill = false
+_G.killLock = false
+_G.auto_eat_eggs = false
+_G.egg_eat_count = 0
+
+_G.auto_evolve = false
+_G.auto_buy_pet = false
+_G.auto_gift_eggs = false
+_G.auto_zhuanp = false
+
+local giftCount = 0
+local giftTargetPlayer = ""
+
+local trainThread = nil
+local proteinThread = nil
+local rebThread = nil
+local shakeThread = nil
+local bugrockThread = nil
+local tradeThread = nil
+local killThread = nil
+local killLockThread = nil
+local evolveThread = nil
+local buyPetThread = nil
+local giftThread = nil
+local eatEggsThread = nil
+local zhuanpThread = nil
+
+local whitelist = {}
+local targetPlayers = {}
+local selectedEvolvePet = ""
+local selectedBuyPet = ""
+local selectedStone = ""
+local btradepls = ""
+
+-- ==================== 辅助函数 ====================
+local function stopThread(threadVar)
+    if threadVar then
+        task.cancel(threadVar)
+        threadVar = nil
+    end
+end
+
+local function getPlayerList()
+    local list = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(list, player.Name)
+        end
+    end
+    return list
+end
+
+local function countEggs()
+    local backpack = LocalPlayer.Backpack
+    local eggCount = 0
+    local eggNames = { "Protein Egg" }
+    
+    for _, eggName in ipairs(eggNames) do
+        local eggs = backpack:GetChildren()
+        for _, item in ipairs(eggs) do
+            if item:IsA("Tool") and item.Name == eggName then
+                eggCount = eggCount + 1
+            end
+        end
+    end
+    
+    return eggCount
+end
+
+local function hasProteinEggEffect()
+    local boostTimers = LocalPlayer:FindFirstChild("boostTimersFolder")
+    return boostTimers and boostTimers:FindFirstChild("Protein Egg") ~= nil
+end
+
+-- ==================== 自动吃蛋 ====================
+local function eatEggsLoop()
+    local lastClickTime = 0
+    local eggToolName = "Protein Egg"
+    local eatenCount = 0
+
+    while _G.auto_eat_eggs do
+        pcall(function()
+            if _G.egg_eat_count > 0 and eatenCount >= _G.egg_eat_count then
+                print("已达到目标吃蛋数量: " .. _G.egg_eat_count .. "，停止吃蛋")
+                _G.auto_eat_eggs = false
+                WindUI:Notify({
+                    Title = "吃蛋完成",
+                    Content = "已吃掉 " .. eatenCount .. " 个蛋",
+                    Duration = 3
+                })
+                return
+            end
+
+            local character = LocalPlayer.Character
+            if not character or not character:FindFirstChild("HumanoidRootPart") then
+                task.wait(0.5)
+                return
+            end
+
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not humanoid then
+                task.wait(0.5)
+                return
+            end
+
+            local backpack = LocalPlayer.Backpack
+            local eggTool = backpack:FindFirstChild(eggToolName)
+            
+            if eggTool then
+                local currentTool = character:FindFirstChildOfClass("Tool")
+                if not currentTool or currentTool.Name ~= eggToolName then
+                    for _, item in pairs(character:GetChildren()) do
+                        if item:IsA("Tool") then
+                            humanoid:UnequipTools()
+                            break
+                        end
+                    end
+                    task.wait(0.1)
+                    humanoid:EquipTool(eggTool)
+                    task.wait(0.2)
+                end
+
+                local equippedTool = character:FindFirstChildOfClass("Tool")
+                if equippedTool and equippedTool.Name == eggToolName then
+                    local currentTime = tick()
+                    if currentTime - lastClickTime >= 0.5 then
+                        VirtualUser:Button1Down(Vector2.new(10, 10), workspace.CurrentCamera.CFrame)
+                        task.wait(0.05)
+                        VirtualUser:Button1Up(Vector2.new(10, 10), workspace.CurrentCamera.CFrame)
+                        lastClickTime = currentTime
+                        eatenCount = eatenCount + 1
+                        print("已吃蛋: " .. eatenCount .. "/" .. _G.egg_eat_count)
+                    end
+                end
+            else
+                print("背包中没有蛋了，停止吃蛋")
+                _G.auto_eat_eggs = false
+                WindUI:Notify({
+                    Title = "蛋已吃完",
+                    Content = "已吃掉 " .. eatenCount .. " 个蛋，背包已空",
+                    Duration = 3
+                })
+                return
+            end
+        end)
+        task.wait(0.1)
+    end
+end
+
+-- ==================== 自动锻炼 ====================
+local autoTrainSpeed = 6
+
+local function trainLoop()
+    while _G.auto_train do
+        pcall(function()
+            local muscleEvent = LocalPlayer.muscleEvent
+            if muscleEvent then
+                for _ = 0, autoTrainSpeed do
+                    muscleEvent:FireServer('rep')
+                end
+            end
+        end)
+        task.wait(0.02)
+    end
+end
+
+-- ==================== 自动吃蛋白蛋 ====================
+local function proteinLoop()
+    while _G.auto_protein do
+        task.wait(1)
+        pcall(function()
+            if not hasProteinEggEffect() then
+                local tool = LocalPlayer.Backpack:FindFirstChild("Protein Egg")
+                if tool and LocalPlayer.Character then
+                    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid:EquipTool(tool)
+                        task.wait(0.2)
+                        
+                        local equipped = LocalPlayer.Character:FindFirstChild("Protein Egg")
+                        if equipped then
+                            LocalPlayer.muscleEvent:FireServer("proteinEgg", equipped)
+                            print("Protein egg used (buff was missing)")
+                        end
+                        
+                        task.wait(0.2)
+                        humanoid:UnequipTools()
+                    end
+                elseif _G.auto_protein then
+                    print('No protein egg in backpack')
+                end
+            elseif _G.auto_protein then
+                print('Protein buff active, waiting...')
+            end
+        end)
+    end
+end
+
+-- ==================== 自动重生 ====================
+local function rebLoop(targetRebirths)
+    while _G.auto_reb_stop do
+        pcall(function()
+            local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+            if leaderstats then
+                local rebirths = leaderstats:FindFirstChild("Rebirths")
+                if rebirths and rebirths.Value >= targetRebirths then
+                    local muscleEvent = LocalPlayer.muscleEvent
+                    if muscleEvent then
+                        muscleEvent:FireServer("rep")
+                        print("Rebirths reached target, sending rep")
+                    end
+                else
+                    local rebirthRemote = game:GetService("ReplicatedStorage"):FindFirstChild("rEvents")
+                    if rebirthRemote then
+                        rebirthRemote = rebirthRemote:FindFirstChild("rebirthRemote")
+                        if rebirthRemote then
+                            rebirthRemote:InvokeServer("rebirthRequest")
+                            print("Requesting rebirth")
+                        end
+                    end
+                end
+            end
+        end)
+        task.wait(0.5)
+    end
+end
+
+-- ==================== 自动奶昔 ====================
+local foodOptions = { "蛋白质棒", "能量棒", "健壮条", "蛋白质奶昔", "超级奶昔", "能量奶昔", "菠萝" }
+
+local foodMapping = {
+    ["蛋白质棒"] = { toolName = "Protein Bar" },
+    ["能量棒"] = { toolName = "Energy Bar" },
+    ["健壮条"] = { toolName = "TOUGH Bar" },
+    ["蛋白质奶昔"] = { toolName = "Protein Shake" },
+    ["超级奶昔"] = { toolName = "ULTRA Shake" },
+    ["能量奶昔"] = { toolName = "Energy Shake" },
+    ["菠萝"] = { toolName = "Tropical Shake" }
+}
+
+local currentFoodIndex = 1
+
+local function getAvailableFoods()
+    local availableFoods = {}
+    local backpack = LocalPlayer.Backpack
+    for _, foodName in ipairs(foodOptions) do
+        local toolName = foodMapping[foodName].toolName
+        if backpack:FindFirstChild(toolName) then
+            table.insert(availableFoods, foodName)
+        end
+    end
+    return availableFoods
+end
+
+local function equipFood(foodData)
+    if not foodData then
+        return false
+    end
+    
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        return false
+    end
+
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool and tool.Name == foodData.toolName then
+        return true
+    else
+        local backpack = LocalPlayer.Backpack
+        local targetTool = backpack:FindFirstChild(foodData.toolName)
+        if targetTool then
+            for _, item in pairs(character:GetChildren()) do
+                if item:IsA("Tool") then
+                    humanoid:UnequipTools()
+                    break
+                end
+            end
+            task.wait(0.1)
+            humanoid:EquipTool(targetTool)
+            task.wait(0.2)
+            tool = character:FindFirstChildOfClass("Tool")
+            if tool and tool.Name == foodData.toolName then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function checkFoodStillExists(foodData)
+    local backpack = LocalPlayer.Backpack
+    return backpack:FindFirstChild(foodData.toolName) ~= nil
+end
+
+local function shakeLoop()
+    while _G.auto_shake do
+        if currentFoodIndex > #foodOptions then
+            currentFoodIndex = 1
+            task.wait(0.5)
+        end
+
+        local currentFoodName = foodOptions[currentFoodIndex]
+        local currentFoodData = foodMapping[currentFoodName]
+        
+        if checkFoodStillExists(currentFoodData) then
+            if equipFood(currentFoodData) then
+                VirtualUser:Button1Down(Vector2.new(10, 10), workspace.CurrentCamera.CFrame)
+                task.wait(0.05)
+                VirtualUser:Button1Up(Vector2.new(10, 10), workspace.CurrentCamera.CFrame)
+            end
+            task.wait(0.1)
+        else
+            currentFoodIndex = currentFoodIndex + 1
+            task.wait(0.2)
+        end
+    end
+end
+
+-- ==================== 卡宠 ====================
+local stoneTypes = {
+    "中石头", "大石头", "沙滩石头", "蓝石头", "紫石头", 
+    "橙石头", "白石头", "绿石头", "丛林石头"
+}
+
+local function getStoneRock(stoneName)
+    local machines = workspace.machinesFolder
+    
+    if stoneName == "蓝石头" then
+        local rock = machines:FindFirstChild("Frozen Rock")
+        return rock and rock:FindFirstChild("Rock")
+        
+    elseif stoneName == "紫石头" then
+        for _, child in ipairs(machines:GetChildren()) do
+            if child.Name == "Frozen Rock" 
+                and child:FindFirstChild("durabilityGain") 
+                and child.durabilityGain.Value == 30 then
+                return child:FindFirstChild("Rock")
+            end
+        end
+        
+    elseif stoneName == "橙石头" then
+        local rock = machines:FindFirstChild("Inferno Rock")
+        return rock and rock:FindFirstChild("Rock")
+        
+    elseif stoneName == "白石头" then
+        local rock = machines:FindFirstChild("Rock Of Legends")
+        return rock and rock:FindFirstChild("Rock")
+        
+    elseif stoneName == "绿石头" then
+        local rock = machines:FindFirstChild("Muscle King Mountain")
+        return rock and rock:FindFirstChild("Rock")
+        
+    elseif stoneName == "丛林石头" then
+        local rock = machines:FindFirstChild("Ancient Jungle Rock")
+        return rock and rock:FindFirstChild("Rock")
+        
+    elseif stoneName == "沙滩石头" then
+        for _, child in ipairs(machines:GetChildren()) do
+            if child.Name == "Punching Rock" 
+                and child:FindFirstChild("durabilityGain") 
+                and child.durabilityGain.Value == 8 then
+                return child:FindFirstChild("Rock")
+            end
+        end
+        
+    elseif stoneName == "大石头" then
+        for _, child in ipairs(machines:GetChildren()) do
+            if child.Name == "Punching Rock" 
+                and child:FindFirstChild("durabilityGain") 
+                and child.durabilityGain.Value == 3 then
+                return child:FindFirstChild("Rock")
+            end
+        end
+        
+    elseif stoneName == "中石头" then
+        for _, child in ipairs(machines:GetChildren()) do
+            if child.Name == "Punching Rock" 
+                and child:FindFirstChild("durabilityGain") 
+                and child.durabilityGain.Value == 2 then
+                return child:FindFirstChild("Rock")
+            end
+        end
+    end
+    
+    return nil
+end
+
+local function bugrockAndPunchLoop()
+    while _G.auto_bugrock do
+        task.wait(0.05)
+        pcall(function()
+            -- 自动挥拳
+            LocalPlayer.muscleEvent:FireServer("punch", "leftHand")
+            
+            local backpack = LocalPlayer.Backpack
+            local character = LocalPlayer.Character
+            if backpack:FindFirstChild("Punch") and character then
+                character.Humanoid:EquipTool(backpack.Punch)
+            end
+            
+            -- 石头卡宠
+            if selectedStone ~= "" then
+                local rock = getStoneRock(selectedStone)
+                if rock and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("LeftHand") then
+                    firetouchinterest(rock, LocalPlayer.Character.LeftHand, 0)
+                    task.wait(0.01)
+                    firetouchinterest(rock, LocalPlayer.Character.LeftHand, 1)
+                end
+            end
+        end)
+    end
+end
+
+-- ==================== 自动交易功能 ====================
+local function tradeLoop()
+    while _G.autotrade2 do
+        task.wait(0.5)
+        pcall(function()
+            if btradepls ~= "" then
+                local targetPlayer = Players:FindFirstChild(btradepls)
+                if targetPlayer then
+                    local tradingEvent = game:GetService("ReplicatedStorage").rEvents.tradingEvent
+                    
+                    tradingEvent:FireServer("requestAccepted", targetPlayer)
+                    task.wait(0.2)
+                    tradingEvent:FireServer("acceptTrade")
+                    
+                    print("Trade accepted with: " .. btradepls)
+                else
+                    print("Player not found: " .. btradepls)
+                end
+            end
+        end)
+    end
+end
+
+-- ==================== 自动送蛋功能 ====================
+local function giftLoop()
+    local sentCount = 0
+    
+    while _G.auto_gift_eggs do
+        if sentCount >= giftCount then
+            print("已达到送蛋数量 " .. giftCount .. "，停止送蛋")
+            _G.auto_gift_eggs = false
+            WindUI:Notify({
+                Title = "送蛋完成",
+                Content = "已送蛋 " .. sentCount .. " 个给 " .. giftTargetPlayer,
+                Duration = 3
+            })
+            return
+        end
+        
+        pcall(function()
+            if giftTargetPlayer == "" then
+                print("送蛋目标玩家为空，停止送蛋")
+                _G.auto_gift_eggs = false
+                return
+            end
+            
+            local targetPlayer = Players:FindFirstChild(giftTargetPlayer)
+            if targetPlayer then
+                local consumablesFolder = LocalPlayer:FindFirstChild("consumablesFolder")
+                if consumablesFolder then
+                    local proteinEgg = consumablesFolder:FindFirstChild("Protein Egg")
+                    if proteinEgg then
+                        local giftRemote = game:GetService("ReplicatedStorage").rEvents.giftRemote
+                        giftRemote:InvokeServer("giftRequest", targetPlayer, proteinEgg)
+                        sentCount = sentCount + 1
+                        print("已送蛋 " .. sentCount .. "/" .. giftCount .. " 个给 " .. giftTargetPlayer)
+                    else
+                        print("没有蛋了，停止送蛋")
+                        _G.auto_gift_eggs = false
+                        WindUI:Notify({
+                            Title = "蛋已用完",
+                            Content = "已送蛋 " .. sentCount .. " 个，背包中没有更多蛋了",
+                            Duration = 3
+                        })
+                        return
+                    end
+                else
+                    print("找不到 consumablesFolder")
+                    _G.auto_gift_eggs = false
+                    return
+                end
+            else
+                print("目标玩家不存在: " .. giftTargetPlayer)
+                _G.auto_gift_eggs = false
+                return
+            end
+        end)
+        
+        task.wait(0.09)
+    end
+end
+
+-- ==================== 宠物功能 ====================
+local petList = {
+    ["霓虹守护者"] = { buyName = "Neon Guardian", evolveName = "Neon Guardian" },
+    ["熵爆"] = { buyName = "Entropic Blast", evolveName = "Entropic Blast" },
+    ["肌肉老师"] = { buyName = "Muscle Sensei", evolveName = "Muscle Sensei" },
+    ["永恒超级打击光环"] = { buyName = "Eternal Megastrike", evolveName = "Eternal Megastrike" },
+    ["大超新星光环"] = { buyName = "Grand Supernova", evolveName = "Grand Supernova" },
+    ["金色维京人"] = { buyName = "Golden Viking", evolveName = "Golden Viking" },
+    ["肌肉之王"] = { buyName = "Muscle King", evolveName = "Muscle King" },
+    ["暗星"] = { buyName = "Darkstar Hunter", evolveName = "Darkstar Hunter" },
+    ["雷电幻影"] = { buyName = "Lightning Strike Phantom", evolveName = "Lightning Strike Phantom" },
+    ["永恒打击利维坦"] = { buyName = "Eternal Strike Leviathan", evolveName = "Eternal Strike Leviathan" },
+    ["蔚蓝苔原光环"] = { buyName = "Azure Tundra", evolveName = "Azure Tundra" },
+    ["超能炼狱光环"] = { buyName = "Ultra Inferno", evolveName = "Ultra Inferno" },
+    ["赛博龙"] = { buyName = "Cybernetic Showdown Dragon", evolveName = "Cybernetic Showdown Dragon" },
+    ["以太仙灵小兔"] = { buyName = "Aether Spirit Bunny", evolveName = "Aether Spirit Bunny" },
+    ["终极新星飞马"] = { buyName = "Ultimate Supernova Pegasus", evolveName = "Ultimate Supernova Pegasus" },
+    ["黑暗蝎尾怪传奇"] = { buyName = "Dark Legends Manticore", evolveName = "Dark Legends Manticore" },
+    ["幻影创世龙"] = { buyName = "Phantom Genesis Dragon", evolveName = "Phantom Genesis Dragon" },
+    ["冰波传奇企鹅"] = { buyName = "Frostwave Legends Penguin", evolveName = "Frostwave Legends Penguin" },
+    ["超级小鸟"] = { buyName = "Ultra Birdie", evolveName = "Ultra Birdie" },
+    ["魔法蝴蝶"] = { buyName = "Magic Butterfly", evolveName = "Magic Butterfly" },
+    ["白色凤凰"] = { buyName = "White Pheonix", evolveName = "White Pheonix" },
+    ["绿色释火者"] = { buyName = "Green Firecaster", evolveName = "Green Firecaster" },
+    ["地狱火龙"] = { buyName = "Infernal Dragon", evolveName = "Infernal Dragon" },
+    ["金色凤凰"] = { buyName = "Golden Pheonix", evolveName = "Golden Pheonix" },
+    ["白色飞马"] = { buyName = "White Pegasus", evolveName = "White Pegasus" },
+    ["红色释火者"] = { buyName = "Red Firecaster", evolveName = "Red Firecaster" },
+    ["蓝色释火者"] = { buyName = "Blue Firecaster", evolveName = "Blue Firecaster" },
+    ["紫色猎鹰"] = { buyName = "Purple Falcon", evolveName = "Purple Falcon" },
+    ["红色龙"] = { buyName = "Red Dragon", evolveName = "Red Dragon" },
+    ["蓝色凤凰"] = { buyName = "Blue Pheonix", evolveName = "Blue Pheonix" },
+    ["橙色飞马"] = { buyName = "Orange Pegasus", evolveName = "Orange Pegasus" },
+    ["紫色龙"] = { buyName = "Purple Dragon", evolveName = "Purple Dragon" },
+    ["黄色蝴蝶"] = { buyName = "Yellow Butterfly", evolveName = "Yellow Butterfly" },
+    ["赤红猎鹰"] = { buyName = "Crimson Falcon", evolveName = "Crimson Falcon" },
+    ["绿色蝴蝶"] = { buyName = "Green Butterfly", evolveName = "Green Butterfly" },
+    ["黑暗魔像"] = { buyName = "Dark Golem", evolveName = "Dark Golem" },
+    ["银色小狗"] = { buyName = "Silver Dog", evolveName = "Silver Dog" },
+    ["黑暗德古拉"] = { buyName = "Dark Vampy", evolveName = "Dark Vampy" },
+    ["蓝色小兔"] = { buyName = "Blue Bunny", evolveName = "Blue Bunny" },
+    ["红色小猫"] = { buyName = "Red Kitty", evolveName = "Red Kitty" },
+    ["蓝色小鸟"] = { buyName = "Blue Birdie", evolveName = "Blue Birdie" },
+    ["橙色刺猬"] = { buyName = "Orange Hedgehog", evolveName = "Orange Hedgehog" }
+}
+
+local function getPetNameList()
+    local list = {}
+    for name, _ in pairs(petList) do
+        table.insert(list, name)
+    end
+    return list
+end
+
+local function evolveLoop()
+    while _G.auto_evolve do
+        task.wait(0.5)
+        pcall(function()
+            if selectedEvolvePet ~= "" then
+                local petData = petList[selectedEvolvePet]
+                if petData then
+                    local petEvolveEvent = game:GetService("ReplicatedStorage").rEvents.petEvolveEvent
+                    petEvolveEvent:FireServer("evolvePet", petData.evolveName)
+                    print("Evolving pet: " .. petData.evolveName)
+                end
+            end
+        end)
+    end
+end
+
+local function buyPetLoop()
+    while _G.auto_buy_pet do
+        task.wait(0.5)
+        pcall(function()
+            if selectedBuyPet ~= "" then
+                local petData = petList[selectedBuyPet]
+                if petData then
+                    local petShopFolder = game:GetService("ReplicatedStorage").cPetShopFolder
+                    local petRemote = game:GetService("ReplicatedStorage").cPetShopRemote
+                    petRemote:InvokeServer(petShopFolder:FindFirstChild(petData.buyName))
+                    print("Buying pet: " .. petData.buyName)
+                end
+            end
+        end)
+    end
+end
+
+-- ==================== 自动转盘功能 ====================
+local function auto_zhuanp()
+    while _G.auto_zhuanp do
+        task.wait()
+        local args = {
+            "openFortuneWheel",
+            game:GetService("ReplicatedStorage").fortuneWheelChances:FindFirstChild("Fortune Wheel")
+        }
+        game:GetService("ReplicatedStorage").rEvents.openFortuneWheelRemote:InvokeServer(unpack(args))
+    end
+end
+
+-- ==================== 击杀功能 ====================
+local function touchHead(player)
+    local character = player.Character
+    if character and not table.find(whitelist, player.Name) then
+        local head = character:FindFirstChild("Head")
+        local leftHand = LocalPlayer.Character:FindFirstChild("LeftHand")
+        if head and leftHand then
+            pcall(function()
+                firetouchinterest(head, leftHand, 0)
+                task.wait(0.01)
+                firetouchinterest(head, leftHand, 1)
+            end)
+        end
+    end
+end
+
+local function killAllLoop()
+    while _G.autokill do
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                touchHead(player)
+            end
+        end
+        task.wait(0.1)
+    end
+end
+
+local function killLockLoop()
+    while _G.killLock do
+        for playerName, _ in pairs(targetPlayers) do
+            local player = Players:FindFirstChild(playerName)
+            if player then
+                if table.find(whitelist, playerName) then
+                    goto continue
+                end
+                pcall(function()
+                    local myCharacter = LocalPlayer.Character
+                    local targetCharacter = player.Character
+                    if targetCharacter then
+                        targetCharacter.Head.Anchored = true
+                        targetCharacter.Head.CanCollide = false
+                        
+                        pcall(function()
+                            if targetCharacter.Head.Neck 
+                                and targetCharacter.Head.Neck.Name == "Neck" 
+                                and targetCharacter.Head:FindFirstChild("nameGui") then
+                                
+                                local nameGuiClone = targetCharacter.Head.nameGui:Clone()
+                                nameGuiClone.Parent = targetCharacter.UpperTorso
+                                targetCharacter.Head.Neck:Destroy()
+                                targetCharacter.Head.nameGui:Destroy()
+                                targetCharacter.Head.Transparency = 1
+                                
+                                if targetCharacter.Head:FindFirstChild("Face") then
+                                    targetCharacter.Head.Face:Destroy()
+                                end
+                            end
+                        end)
+                        
+                        pcall(function()
+                            LocalPlayer.muscleEvent:FireServer("punch", "leftHand")
+                            LocalPlayer.muscleEvent:FireServer("punch", "rightHand")
+                            task.wait()
+                            
+                            local leftHand = myCharacter:FindFirstChild("LeftHand")
+                            if leftHand then
+                                targetCharacter.Head.Position = Vector3.new(
+                                    leftHand.Position.X,
+                                    leftHand.Position.Y,
+                                    leftHand.Position.Z
+                                )
+                            end
+                        end)
+                    end
+                end)
+            end
+            ::continue::
+        end
+        task.wait(1)
+    end
+end
+
+-- ==================== WindUI 界面初始化 ====================
+WindUI.TransparencyValue = 0.2
+WindUI:SetTheme("Dark")
+
+local Window = WindUI:CreateWindow({
+    Title = "刘脚本",
+    Author = "2903144038",
+    Size = UDim2.fromOffset(500, 350),
+    Theme = "Dark",
+    SideBarWidth = 220,
+    ScrollBarEnabled = true
+})
+
+Window:Tag({
+    Title = "1.0",
+    Color = Color3.fromHex("#306aff")
+})
+
+-- ==================== 创建标签页 ====================
+local exerciseTab = Window:Tab({ Title = "锻炼", Locked = false })
+local teleportTab = Window:Tab({ Title = "传送", Locked = false })
+local petTab = Window:Tab({ Title = "卡宠", Locked = false })
+local karmaTab = Window:Tab({ Title = "业报", Locked = false })
+local otherTab = Window:Tab({ Title = "其他", Locked = false })
+
+-- ==================== 锻炼 Tab ====================
+exerciseTab:Toggle({
+    Title = "自动锻炼",
+    Value = false,
+    Callback = function(state)
+        _G.auto_train = state
+        if state then
+            stopThread(trainThread)
+            trainThread = task.spawn(trainLoop)
+            print("Auto training enabled")
+        else
+            stopThread(trainThread)
+            print("Auto training disabled")
+        end
+    end
+})
+
+local dzcs = 0
+exerciseTab:Input({
+    Title = "请输入指定重生次数",
+    Value = "",
+    PlaceholderText = "请输入数字",
+    ClearTextOnFocus = false,
+    Callback = function(Text)
+        dzcs = tonumber(Text) or 0
+        print("Target rebirths set to: " .. dzcs)
+    end
+})
+
+exerciseTab:Toggle({
+    Title = "自动重生",
+    Locked = false,
+    Value = false,
+    Callback = function(state)
+        _G.auto_reb_stop = state
+        if state then
+            if dzcs <= 0 then
+                print("Please set a valid target rebirths first")
+                return
+            end
+            stopThread(rebThread)
+            rebThread = task.spawn(function() rebLoop(dzcs) end)
+            print("Auto rebirth enabled, target: " .. dzcs)
+        else
+            stopThread(rebThread)
+            print("Auto rebirth disabled")
+        end
+    end
+})
+
+exerciseTab:Toggle({
+    Title = "自动吃蛋",
+    Value = false,
+    Callback = function(state)
+        _G.auto_protein = state
+        if state then
+            stopThread(proteinThread)
+            proteinThread = task.spawn(proteinLoop)
+            print("Auto protein egg enabled")
+        else
+            stopThread(proteinThread)
+            print("Auto protein egg disabled")
+        end
+    end
+})
+
+exerciseTab:Toggle({
+    Title = "自动吃掉背包所有奶昔",
+    Desc = "不包括蛋",
+    Value = false,
+    Callback = function(state)
+        _G.auto_shake = state
+        if state then
+            currentFoodIndex = 1
+            stopThread(shakeThread)
+            shakeThread = task.spawn(shakeLoop)
+            print("Auto shake enabled")
+        else
+            stopThread(shakeThread)
+            print("Auto shake disabled")
+        end
+    end
+})
+
+-- ==================== 传送 Tab ====================
+local tpLocations = {
+    {"大厅", CFrame.new(2.93, 88.93, 243.94)},
+    {"小岛", CFrame.new(-38.86, 7.53, 1894.03)},
+    {"冰霜健身房", CFrame.new(-2623.02, 7.38, -409.07)},
+    {"神话健身房", CFrame.new(2250.77, 7.38, 1073.22)},
+    {"永恒健身房", CFrame.new(-6758.96, 7.38, -1284.91)},
+    {"传奇健身房", CFrame.new(4603.28, 991.53, -3897.86)},
+    {"肌肉之王", CFrame.new(-8625.92, 17.23, -5730.47)},
+    {"丛林健身房", CFrame.new(-8685.62, 6.81, 2392.32)},
+    {"转盘岛", CFrame.new(1952.09, 1.86, 6180.28)},
+    {"熔岩争斗", CFrame.new(4472.61, 119.96, -8849.90)},
+    {"沙漠争斗", CFrame.new(987.70, 17.23, -7440.26)},
+    {"海滩争斗", CFrame.new(-1863.18, 17.23, -6292.78)},
+}
+
+for _, location in ipairs(tpLocations) do
+    teleportTab:Button({
+        Title = location[1],
+        Callback = function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame = location[2]
+            end
+        end
+    })
+end
+
+teleportTab:Button({
+    Title = "安全平台",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if char then
+            char.HumanoidRootPart.CFrame = CFrame.new(-300, 100100, -450)
+            local part = Instance.new("Part")
+            part.Parent = workspace
+            part.CFrame = CFrame.new(-300, 100000, -450)
+            part.Size = Vector3.new(1000000, 0, 10000000)
+            part.Anchored = true
+        end
+    end
+})
+
+-- ==================== 卡宠 Tab ====================
+petTab:Button({
+    Title = "传送到无转盘岛",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = CFrame.new(1952.0936279296875, 1.8604812622070312, 6180.2841796875)
+        end
+    end
+})
+
+petTab:Dropdown({
+    Title = "请选择石头:",
+    Multi = false,
+    Value = "",
+    AllowNone = true,
+    Values = stoneTypes,
+    Callback = function(Tab)
+        selectedStone = Tab or ""
+        if selectedStone ~= "" then
+            print("Selected stone: " .. selectedStone)
+        end
+    end
+})
+
+petTab:Toggle({
+    Title = "自动卡宠",
+    Value = false,
+    Callback = function(state)
+        _G.auto_bugrock = state
+        if state then
+            if selectedStone == "" then
+                print("请先选择石头")
+                WindUI:Notify({
+                    Title = "智障",
+                    Content = "请先选择石头类型",
+                    Duration = 2
+                })
+                return
+            end
+            stopThread(bugrockThread)
+            bugrockThread = task.spawn(bugrockAndPunchLoop)
+            WindUI:Notify({
+                Title = "已开启",
+                Content = "自动卡宠已开启",
+                Duration = 2
+            })
+        else
+            stopThread(bugrockThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Content = "自动卡宠已关闭",
+                Duration = 2
+            })
+        end
+    end
+})
+
+petTab:Divider()
+
+petTab:Input({
+    Title = "请输入要同意交易的玩家用户名",
+    Value = "",
+    PlaceholderText = "请输入玩家用户名",
+    ClearTextOnFocus = false,
+    Callback = function(Text)
+        btradepls = Text
+        print("Target player set to: " .. btradepls)
+    end
+})
+
+petTab:Toggle({
+    Title = "自动同意交易",
+    Value = false,
+    Callback = function(state)
+        _G.autotrade2 = state
+        if state then
+            if btradepls == "" then
+                WindUI:Notify({
+                    Title = "弱智",
+                    Content = "请先输入要交易的目标玩家用户名",
+                    Duration = 2
+                })
+                return
+            end
+            stopThread(tradeThread)
+            tradeThread = task.spawn(tradeLoop)
+            WindUI:Notify({
+                Title = "已开启",
+                Duration = 2
+            })
+            print("Auto trade enabled for: " .. btradepls)
+        else
+            stopThread(tradeThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Duration = 2
+            })
+            print("Auto trade disabled")
+        end
+    end
+})
+
+-- ==================== 业报 Tab ====================
+local whitelistDropdown = karmaTab:Dropdown({
+    Title = "添加白名单",
+    Multi = false,
+    Value = "",
+    AllowNone = true,
+    Values = getPlayerList(),
+    Callback = function(Tab)
+        local playerName = Tab or ""
+        if playerName ~= "" then
+            if not table.find(whitelist, playerName) then
+                table.insert(whitelist, playerName)
+                WindUI:Notify({
+                    Title = "已添加",
+                    Content = playerName .. " 已加入白名单",
+                    Duration = 2
+                })
+                print("Added to whitelist: " .. playerName)
+            else
+                WindUI:Notify({
+                    Title = "弱智",
+                    Content = playerName .. " 已在白名单中",
+                    Duration = 2
+                })
+            end
+        end
+    end
+})
+
+local removeWhitelistDropdown = karmaTab:Dropdown({
+    Title = "移除白名单",
+    Multi = false,
+    Value = "",
+    AllowNone = true,
+    Values = function()
+        return whitelist
+    end,
+    Callback = function(Tab)
+        local playerName = Tab or ""
+        if playerName ~= "" then
+            for i, name in ipairs(whitelist) do
+                if name == playerName then
+                    table.remove(whitelist, i)
+                    WindUI:Notify({
+                        Title = "已移除",
+                        Content = playerName .. " 已从白名单移除",
+                        Duration = 2
+                    })
+                    print("Removed from whitelist: " .. playerName)
+                    break
+                end
+            end
+        end
+    end
+})
+
+karmaTab:Toggle({
+    Title = "自动击杀全部",
+    Value = false,
+    Callback = function(state)
+        _G.autokill = state
+        if state then
+            stopThread(killThread)
+            killThread = task.spawn(killAllLoop)
+            WindUI:Notify({
+                Title = "已开启",
+                Content = "自动击杀全部已开启",
+                Duration = 2
+            })
+        else
+            stopThread(killThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Content = "自动击杀全部已关闭",
+                Duration = 2
+            })
+        end
+    end
+})
+
+local lockKillDropdown = karmaTab:Dropdown({
+    Title = "添加锁定击杀玩家",
+    Multi = false,
+    Value = "",
+    AllowNone = true,
+    Values = getPlayerList(),
+    Callback = function(Tab)
+        local playerName = Tab or ""
+        if playerName ~= "" then
+            if not targetPlayers[playerName] then
+                targetPlayers[playerName] = true
+                WindUI:Notify({
+                    Title = "已添加",
+                    Content = playerName .. " 已加入锁定击杀列表",
+                    Duration = 2
+                })
+                print("Added to kill lock: " .. playerName)
+            else
+                WindUI:Notify({
+                    Title = "智障",
+                    Content = playerName .. " 已在锁定击杀列表中",
+                    Duration = 2
+                })
+            end
+        end
+    end
+})
+
+local removeLockKillDropdown = karmaTab:Dropdown({
+    Title = "移除锁定击杀玩家",
+    Multi = false,
+    Value = "",
+    AllowNone = true,
+    Values = function()
+        local list = {}
+        for name, _ in pairs(targetPlayers) do
+            table.insert(list, name)
+        end
+        return list
+    end,
+    Callback = function(Tab)
+        local playerName = Tab or ""
+        if playerName ~= "" and targetPlayers[playerName] then
+            targetPlayers[playerName] = nil
+            WindUI:Notify({
+                Title = "已移除",
+                Content = playerName .. " 已从锁定击杀列表移除",
+                Duration = 2
+            })
+            print("Removed from kill lock: " .. playerName)
+        end
+    end
+})
+
+karmaTab:Toggle({
+    Title = "锁定击杀",
+    Value = false,
+    Callback = function(state)
+        _G.killLock = state
+        if state then
+            local hasTarget = false
+            for _ in pairs(targetPlayers) do
+                hasTarget = true
+                break
+            end
+            if not hasTarget then
+                WindUI:Notify({
+                    Title = "弱智",
+                    Content = "请先选择锁定击杀目标",
+                    Duration = 2
+                })
+                return
+            end
+            stopThread(killLockThread)
+            killLockThread = task.spawn(killLockLoop)
+            WindUI:Notify({
+                Title = "已开启",
+                Content = "锁定击杀已开启",
+                Duration = 2
+            })
+        else
+            stopThread(killLockThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Content = "锁定击杀已关闭",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- ==================== 其他 Tab ====================
+local petNameList = getPetNameList()
+
+otherTab:Dropdown({
+    Title = "选择宠物",
+    Multi = false,
+    Value = "",
+    AllowNone = true,
+    Values = petNameList,
+    Callback = function(Tab)
+        selectedBuyPet = Tab or ""
+        selectedEvolvePet = Tab or ""
+        if selectedBuyPet ~= "" then
+            local petData = petList[selectedBuyPet]
+            if petData then
+                print("Selected pet: " .. selectedBuyPet .. " -> " .. petData.buyName)
+            end
+        end
+    end
+})
+
+otherTab:Toggle({
+    Title = "自动购买宠物",
+    Value = false,
+    Callback = function(state)
+        _G.auto_buy_pet = state
+        if state then
+            if selectedBuyPet == "" then
+                WindUI:Notify({
+                    Title = "智障",
+                    Content = "请先选择要购买的宠物",
+                    Duration = 2
+                })
+                return
+            end
+            stopThread(buyPetThread)
+            buyPetThread = task.spawn(buyPetLoop)
+            WindUI:Notify({
+                Title = "已开启",
+                Content = "自动购买宠物已开启",
+                Duration = 2
+            })
+        else
+            stopThread(buyPetThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Content = "自动购买宠物已关闭",
+                Duration = 2
+            })
+        end
+    end
+})
+
+otherTab:Toggle({
+    Title = "自动进化宠物",
+    Value = false,
+    Callback = function(state)
+        _G.auto_evolve = state
+        if state then
+            if selectedEvolvePet == "" then
+                WindUI:Notify({
+                    Title = "智障",
+                    Content = "请先在上方选择宠物",
+                    Duration = 2
+                })
+                return
+            end
+            stopThread(evolveThread)
+            evolveThread = task.spawn(evolveLoop)
+            WindUI:Notify({
+                Title = "已开启",
+                Content = "自动进化已开启",
+                Duration = 2
+            })
+        else
+            stopThread(evolveThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Content = "自动进化已关闭",
+                Duration = 2
+            })
+        end
+    end
+})
+
+otherTab:Toggle({
+    Title = "自动转盘",
+    Value = false,
+    Callback = function(state)
+        _G.auto_zhuanp = state
+        if state then
+            stopThread(zhuanpThread)
+            zhuanpThread = task.spawn(auto_zhuanp)
+        else
+            stopThread(zhuanpThread)
+        end
+    end
+})
+
+-- ==================== 蛋数量显示 ====================
+local eggCountDisplay = otherTab:Paragraph({
+    Title = "剩余蛋数量:",
+    Desc = "检测中...",
+})
+
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            local eggCount = countEggs()
+            eggCountDisplay:SetDesc(tostring(eggCount) .. " 个")
+        end)
+    end
+end)
+
+-- ==================== 自动送蛋功能 ====================
+local giftTargetDropdown = otherTab:Dropdown({
+    Title = "选择送蛋目标玩家",
+    Multi = false,
+    Value = "",
+    AllowNone = true,
+    Values = getPlayerList(),
+    Callback = function(Tab)
+        giftTargetPlayer = Tab or ""
+        if giftTargetPlayer ~= "" then
+            WindUI:Notify({
+                Title = "已设置",
+                Content = "送蛋目标: " .. giftTargetPlayer,
+                Duration = 2
+            })
+        end
+    end
+})
+
+local giftCountInput = otherTab:Input({
+    Title = "送蛋数量",
+    Value = "",
+    PlaceholderText = "请输入送蛋数量",
+    ClearTextOnFocus = false,
+    Callback = function(Text)
+        giftCount = tonumber(Text) or 0
+    end
+})
+
+otherTab:Toggle({
+    Title = "自动送蛋",
+    Value = false,
+    Callback = function(state)
+        _G.auto_gift_eggs = state
+        if state then
+            if giftTargetPlayer == "" then
+                WindUI:Notify({
+                    Title = "弱智",
+                    Content = "请先选择送蛋目标玩家",
+                    Duration = 2
+                })
+                _G.auto_gift_eggs = false
+                return
+            end
+            if giftCount <= 0 then
+                WindUI:Notify({
+                    Title = "智障",
+                    Content = "请先输入有效的送蛋数量",
+                    Duration = 2
+                })
+                _G.auto_gift_eggs = false
+                return
+            end
+            stopThread(giftThread)
+            giftThread = task.spawn(giftLoop)
+            WindUI:Notify({
+                Title = "已开启",
+                Content = "自动送蛋已开启，目标: " .. giftTargetPlayer .. "，数量: " .. giftCount,
+                Duration = 2
+            })
+        else
+            stopThread(giftThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Content = "自动送蛋已关闭",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- ==================== 自动吃蛋 ====================
+local eggEatInput = otherTab:Input({
+    Title = "吃蛋数量",
+    Value = "0",
+    PlaceholderText = "输入要吃掉蛋数量",
+    ClearTextOnFocus = false,
+    Callback = function(Text)
+        _G.egg_eat_count = tonumber(Text) or 0
+        if _G.egg_eat_count < 0 then
+            _G.egg_eat_count = 0
+        end
+    end
+})
+
+otherTab:Toggle({
+    Title = "自动吃掉背包所有蛋",
+    Desc = "0为全部",
+    Value = false,
+    Callback = function(state)
+        _G.auto_eat_eggs = state
+        if state then
+            local currentEggCount = countEggs()
+            if currentEggCount == 0 then
+                WindUI:Notify({
+                    Title = "没有蛋",
+                    Content = "背包中没有蛋可以吃",
+                    Duration = 2
+                })
+                _G.auto_eat_eggs = false
+                return
+            end
+            
+            if _G.egg_eat_count > 0 and currentEggCount < _G.egg_eat_count then
+                WindUI:Notify({
+                    Title = "蛋数量不足",
+                    Content = "当前只有 " .. currentEggCount .. " 个蛋，但要求吃 " .. _G.egg_eat_count .. " 个",
+                    Duration = 3
+                })
+                _G.auto_eat_eggs = false
+                return
+            end
+            
+            stopThread(eatEggsThread)
+            eatEggsThread = task.spawn(eatEggsLoop)
+            
+            local msg = "自动吃蛋已开启"
+            if _G.egg_eat_count > 0 then
+                msg = msg .. "，将吃掉 " .. _G.egg_eat_count .. " 个蛋"
+            else
+                msg = msg .. "，将吃掉全部蛋 (" .. currentEggCount .. " 个)"
+            end
+            WindUI:Notify({
+                Title = "已开启",
+                Content = msg,
+                Duration = 2
+            })
+        else
+            stopThread(eatEggsThread)
+            WindUI:Notify({
+                Title = "已关闭",
+                Content = "自动吃蛋已关闭",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- ==================== 玩家列表定时刷新 ====================
+task.spawn(function()
+    while true do
+        task.wait(2)
+        local playerList = getPlayerList()
+        
+        if whitelistDropdown then
+            whitelistDropdown:SetValues(playerList)
+        end
+        
+        if lockKillDropdown then
+            lockKillDropdown:SetValues(playerList)
+        end
+        
+        if giftTargetDropdown then
+            giftTargetDropdown:SetValues(playerList)
+        end
+        
+        if removeWhitelistDropdown then
+            removeWhitelistDropdown:SetValues(whitelist)
+        end
+        
+        if removeLockKillDropdown then
+            local killList = {}
+            for name, _ in pairs(targetPlayers) do
+                table.insert(killList, name)
+            end
+            removeLockKillDropdown:SetValues(killList)
+        end
+    end
+end)
+
+-- ==================== 启动完成 ====================
+task.wait(0.5)
+WindUI:Notify({
+    Title = "脚本加载完成",
+    Content = "欢迎使用刘脚本",
+    Duration = 2
+})
